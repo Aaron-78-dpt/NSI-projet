@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import json
 import webbrowser
 from PIL import Image, ImageTk
@@ -9,16 +9,65 @@ import io
 from api import Recherche
 
 
+# =========================
+# FENÊTRE
+# =========================
+
 fenetre = tk.Tk()
+fenetre.title("CheapShark Comparator")
+fenetre.geometry("3400x1440")
+fenetre.config(bg="#1E1E1E")
 
-fenetre.title("Comparateur CheapShark")
-fenetre.geometry("900x600")
 
+# =========================
+# NOTEBOOK (ONGLETS)
+# =========================
+
+notebook = ttk.Notebook(fenetre)
+notebook.pack(fill="both", expand=True)
+
+tab_recherche = tk.Frame(notebook, bg="#1E1E1E")
+tab_favoris = tk.Frame(notebook, bg="#1E1E1E")
+
+notebook.add(tab_recherche, text="🔎 Recherche")
+notebook.add(tab_favoris, text="⭐ Favoris")
+
+
+# =========================
+# VARIABLES
+# =========================
 
 liste_jeux = []
 jeu_actuel = None
-image_label = None
 photo = None
+
+
+# =========================
+# IMAGE
+# =========================
+
+image_label = tk.Label(tab_recherche, bg="#1E1E1E")
+image_label.pack(pady=10)
+
+
+def afficherImage(url):
+
+    global photo
+
+    try:
+        image_bytes = urlopen(url).read()
+        data_stream = io.BytesIO(image_bytes)
+
+        img = Image.open(data_stream)
+        img = img.resize((180, 220))
+
+        photo = ImageTk.PhotoImage(img)
+
+        image_label.config(image=photo)
+        image_label.image = photo
+
+    except:
+        pass
 
 
 # =========================
@@ -27,95 +76,50 @@ photo = None
 
 def rechercher():
 
-    global liste_jeux
-    global jeu_actuel
+    global liste_jeux, jeu_actuel
 
     nom = entry.get()
 
     if nom == "":
         return
 
-    # historique
-    with open(
-        "historique.txt",
-        "a",
-        encoding="utf-8"
-    ) as f:
-
+    with open("historique.txt", "a", encoding="utf-8") as f:
         f.write(nom + "\n")
 
     jeu_actuel = Recherche(nom)
-
     liste_jeux = jeu_actuel.chercherJeux()
 
     listbox.delete(0, tk.END)
 
-    for jeu in liste_jeux[:20]:
-
-        listbox.insert(
-            tk.END,
-            jeu["external"]
-        )
+    for j in liste_jeux[:20]:
+        listbox.insert(tk.END, j["external"])
 
 
 # =========================
-# AFFICHER DEALS
+# DEALS
 # =========================
 
 def voirDeals():
 
-    selection = listbox.curselection()
+    sel = listbox.curselection()
 
-    if not selection:
+    if not sel:
         return
 
-    index = selection[0]
+    jeu = liste_jeux[sel[0]]
 
-    jeu = liste_jeux[index]
+    afficherImage(jeu["thumb"])
 
-    afficherImage(
-        jeu["thumb"]
-    )
-
-    gameID = jeu["gameID"]
-
-    deals = jeu_actuel.recupererDeals(gameID)
+    deals = jeu_actuel.recupererDeals(jeu["gameID"])
 
     textbox.delete("1.0", tk.END)
 
-    for deal in deals:
-
-        texte = (
-            f"{deal['store']} | "
-            f"{deal['price']}$ | "
-            f"-{deal['savings']}%\n"
-        )
+    for d in deals:
 
         textbox.insert(
             tk.END,
-            texte
+            f"{d['store']} | {d['price']}$ | -{d['savings']}%\n"
         )
-
-# =========================
-# AFFICHER IMAGE
-# =========================
-
-def afficherImage(url):
-
-    global photo
-    global image_label
-
-    image_bytes = urlopen(url).read()
-
-    data_stream = io.BytesIO(image_bytes)
-
-    pil_image = Image.open(data_stream)
-
-    pil_image = pil_image.resize((200, 250))
-
-    photo = ImageTk.PhotoImage(pil_image)
-
-    image_label.config(image=photo)
 
 
 # =========================
@@ -124,48 +128,43 @@ def afficherImage(url):
 
 def ajouterFavori():
 
-    selection = listbox.curselection()
+    sel = listbox.curselection()
 
-    if not selection:
+    if not sel:
         return
 
-    index = selection[0]
-
-    jeu = liste_jeux[index]
+    jeu = liste_jeux[sel[0]]
 
     favoris = []
 
     try:
-
-        with open(
-            "favoris.json",
-            "r",
-            encoding="utf-8"
-        ) as f:
-
+        with open("favoris.json", "r", encoding="utf-8") as f:
             favoris = json.load(f)
-
     except:
         pass
 
-    favoris.append(jeu["external"])
+    if jeu["external"] not in favoris:
+        favoris.append(jeu["external"])
 
-    with open(
-        "favoris.json",
-        "w",
-        encoding="utf-8"
-    ) as f:
+    with open("favoris.json", "w", encoding="utf-8") as f:
+        json.dump(favoris, f, indent=4)
 
-        json.dump(
-            favoris,
-            f,
-            indent=4
-        )
+    messagebox.showinfo("Favoris", "Ajouté !")
 
-    messagebox.showinfo(
-        "Favoris",
-        "Jeu ajouté aux favoris"
-    )
+
+def afficherFavoris():
+
+    liste_fav.delete(0, tk.END)
+
+    try:
+        with open("favoris.json", "r", encoding="utf-8") as f:
+            favoris = json.load(f)
+
+        for favo in favoris:
+            liste_fav.insert(tk.END, favo)
+
+    except:
+        pass
 
 
 # =========================
@@ -174,100 +173,125 @@ def ajouterFavori():
 
 def ouvrirSite():
 
-    selection = listbox.curselection()
+    sel = listbox.curselection()
 
-    if not selection:
+    if not sel:
         return
 
-    index = selection[0]
+    jeu = liste_jeux[sel[0]]
 
-    jeu = liste_jeux[index]
-
-    url = (
-        "https://www.cheapshark.com/"
-        f"redirect?dealID={jeu['cheapestDealID']}"
-    )
+    url = f"https://www.cheapshark.com/redirect?dealID={jeu['cheapestDealID']}"
 
     webbrowser.open(url)
 
 
 # =========================
-# INTERFACE
+# UI RECHERCHE
 # =========================
 
-titre = tk.Label(
-    fenetre,
-    text="Comparateur CheapShark",
-    font=("Arial", 22)
+title = tk.Label(
+    tab_recherche,
+    text="🎮 CheapShark Comparator",
+    font=("Arial", 20, "bold"),
+    fg="white",
+    bg="#1E1E1E"
 )
-
-titre.pack(pady=20)
+title.pack(pady=10)
 
 
 entry = tk.Entry(
-    fenetre,
+    tab_recherche,
     width=40,
-    font=("Arial", 14)
+    font=("Arial", 14),
+    bg="#2A2A2A",
+    fg="white",
+    insertbackground="white"
 )
-
 entry.pack(pady=10)
 
 
-btnRecherche = tk.Button(
-    fenetre,
+tk.Button(
+    tab_recherche,
     text="Rechercher",
     command=rechercher
-)
-
-btnRecherche.pack(pady=10)
+).pack(pady=5)
 
 
 listbox = tk.Listbox(
-    fenetre,
-    width=50,
-    height=10
+    tab_recherche,
+    width=60,
+    height=10,
+    bg="#2A2A2A",
+    fg="white",
+    selectbackground="#4C8BF5"
 )
-
 listbox.pack(pady=10)
 
 
-btnDeals = tk.Button(
-    fenetre,
-    text="Voir tous les deals",
+tk.Button(
+    tab_recherche,
+    text="Voir deals",
     command=voirDeals
-)
+).pack(pady=5)
 
-btnDeals.pack(pady=5)
-
-
-btnFavoris = tk.Button(
-    fenetre,
-    text="Ajouter aux favoris",
+tk.Button(
+    tab_recherche,
+    text="Ajouter favoris",
     command=ajouterFavori
-)
+).pack(pady=5)
 
-btnFavoris.pack(pady=5)
-
-
-btnSite = tk.Button(
-    fenetre,
-    text="Ouvrir le deal",
+tk.Button(
+    tab_recherche,
+    text="Ouvrir deal",
     command=ouvrirSite
-)
-
-btnSite.pack(pady=5)
+).pack(pady=5)
 
 
 textbox = tk.Text(
-    fenetre,
-    width=70,
-    height=15
+    tab_recherche,
+    width=80,
+    height=12,
+    bg="#2A2A2A",
+    fg="white"
 )
+textbox.pack(pady=10)
 
-textbox.pack(pady=20)
 
-image_label = tk.Label(fenetre)
+# =========================
+# FAVORIS TAB
+# =========================
 
-image_label.pack(pady=10)
+tk.Label(
+    tab_favoris,
+    text="⭐ Mes Favoris",
+    font=("Arial", 20),
+    fg="white",
+    bg="#1E1E1E"
+).pack(pady=10)
+
+
+tk.Button(
+    tab_favoris,
+    text="Actualiser",
+    command=afficherFavoris
+).pack(pady=10)
+
+
+liste_fav = tk.Listbox(
+    tab_favoris,
+    width=60,
+    height=20,
+    bg="#2A2A2A",
+    fg="white"
+)
+liste_fav.pack(pady=10)
+
+
+afficherFavoris()
+
+
+# =========================
+# RUN
+# =========================
 
 fenetre.mainloop()
