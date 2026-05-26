@@ -1,8 +1,9 @@
+import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 import json
 import webbrowser
-from PIL import Image, ImageTk
+from PIL import Image
 from urllib.request import urlopen
 import io
 
@@ -10,27 +11,15 @@ from api import Recherche
 
 
 # =========================
-# FENÊTRE
+# STYLE GLOBAL
 # =========================
 
-fenetre = tk.Tk()
-fenetre.title("CheapShark Comparator")
-fenetre.geometry("3400x1440")
-fenetre.config(bg="#1E1E1E")
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
-
-# =========================
-# NOTEBOOK (ONGLETS)
-# =========================
-
-notebook = ttk.Notebook(fenetre)
-notebook.pack(fill="both", expand=True)
-
-tab_recherche = tk.Frame(notebook, bg="#1E1E1E")
-tab_favoris = tk.Frame(notebook, bg="#1E1E1E")
-
-notebook.add(tab_recherche, text="🔎 Recherche")
-notebook.add(tab_favoris, text="⭐ Favoris")
+app = ctk.CTk()
+app.title("CheapShark Pro Comparator")
+app.geometry("3400x1440")
 
 
 # =========================
@@ -39,31 +28,21 @@ notebook.add(tab_favoris, text="⭐ Favoris")
 
 liste_jeux = []
 jeu_actuel = None
-photo = None
 
 
 # =========================
 # IMAGE
 # =========================
 
-image_label = tk.Label(tab_recherche, bg="#1E1E1E")
-image_label.pack(pady=10)
-
-
 def afficherImage(url):
 
-    global photo
-
     try:
-        image_bytes = urlopen(url).read()
-        data_stream = io.BytesIO(image_bytes)
-
-        img = Image.open(data_stream)
+        data = urlopen(url).read()
+        img = Image.open(io.BytesIO(data))
         img = img.resize((180, 220))
 
-        photo = ImageTk.PhotoImage(img)
-
-        image_label.config(image=photo)
+        photo = ctk.CTkImage(light_image=img, size=(180, 220))
+        image_label.configure(image=photo)
         image_label.image = photo
 
     except:
@@ -71,7 +50,7 @@ def afficherImage(url):
 
 
 # =========================
-# RECHERCHE
+# RECHERCHE JEUX
 # =========================
 
 def rechercher():
@@ -80,7 +59,7 @@ def rechercher():
 
     nom = entry.get()
 
-    if nom == "":
+    if not nom:
         return
 
     with open("historique.txt", "a", encoding="utf-8") as f:
@@ -91,7 +70,7 @@ def rechercher():
 
     listbox.delete(0, tk.END)
 
-    for j in liste_jeux[:20]:
+    for j in liste_jeux[:25]:
         listbox.insert(tk.END, j["external"])
 
 
@@ -102,7 +81,6 @@ def rechercher():
 def voirDeals():
 
     sel = listbox.curselection()
-
     if not sel:
         return
 
@@ -112,10 +90,9 @@ def voirDeals():
 
     deals = jeu_actuel.recupererDeals(jeu["gameID"])
 
-    textbox.delete("1.0", tk.END)
+    textbox.delete("0.0", tk.END)
 
     for d in deals:
-
         textbox.insert(
             tk.END,
             f"{d['store']} | {d['price']}$ | -{d['savings']}%\n"
@@ -126,46 +103,175 @@ def voirDeals():
 # FAVORIS
 # =========================
 
+def charger_favoris():
+
+    try:
+        with open("favoris.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+
+def sauvegarder_favoris(data):
+
+    with open("favoris.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+
 def ajouterFavori():
 
     sel = listbox.curselection()
-
     if not sel:
         return
 
     jeu = liste_jeux[sel[0]]
 
-    favoris = []
+    fav = charger_favoris()
 
-    try:
-        with open("favoris.json", "r", encoding="utf-8") as f:
-            favoris = json.load(f)
-    except:
-        pass
+    if jeu["external"] not in fav:
+        fav.append(jeu["external"])
 
-    if jeu["external"] not in favoris:
-        favoris.append(jeu["external"])
+    sauvegarder_favoris(fav)
 
-    with open("favoris.json", "w", encoding="utf-8") as f:
-        json.dump(favoris, f, indent=4)
+    messagebox.showinfo("Favoris", "Ajouté ⭐")
 
-    messagebox.showinfo("Favoris", "Ajouté !")
+    afficherFavoris()
+
+
+def supprimerFavori():
+
+    sel = fav_list.curselection()
+    if not sel:
+        return
+
+    fav = charger_favoris()
+
+    del fav[sel[0]]
+
+    sauvegarder_favoris(fav)
+
+    afficherFavoris()
 
 
 def afficherFavoris():
 
-    liste_fav.delete(0, tk.END)
+    fav_list.delete(0, tk.END)
 
+    fav = charger_favoris()
+
+    for f in fav:
+        fav_list.insert(tk.END, f)
+
+
+def ouvrirFavori(event):
+
+    sel = fav_list.curselection()
+    if not sel:
+        return
+
+    game = fav_list.get(sel[0])
+
+    url = f"https://www.cheapshark.com/search?q={game}"
+    webbrowser.open(url)
+
+def rechercherFavoris():
+
+    query = fav_search.get().lower()
+
+    fav_list.delete(0, tk.END)
+
+    fav = charger_favoris()
+
+    for f in fav:
+        if query in f.lower():
+            fav_list.insert(tk.END, f)
+
+# =========================
+# PANIER
+# =========================
+
+def charger_panier():
     try:
-        with open("favoris.json", "r", encoding="utf-8") as f:
-            favoris = json.load(f)
-
-        for favo in favoris:
-            liste_fav.insert(tk.END, favo)
-
+        with open("panier.json", "r", encoding="utf-8") as f:
+            return json.load(f)
     except:
-        pass
+        return []
 
+
+def sauvegarder_panier(data):
+    with open("panier.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+
+def ajouterPanier():
+
+    sel = listbox.curselection()
+    if not sel:
+        return
+
+    jeu = liste_jeux[sel[0]]
+
+    panier = charger_panier()
+
+    panier.append({
+        "name": jeu["external"],
+        "id": jeu["gameID"]
+    })
+
+    sauvegarder_panier(panier)
+
+    messagebox.showinfo("Panier", "Ajouté 🛒")
+
+    afficherPanier()
+
+
+def ouvrirPanier():
+
+    sel = cart_list.curselection()
+    if not sel:
+        return
+
+    jeu = cart_list.get(sel[0])
+
+    url = f"https://www.cheapshark.com/search?q={jeu}"
+    webbrowser.open(url)
+
+
+def supprimerPanier():
+
+    sel = cart_list.curselection()
+    if not sel:
+        return
+
+    panier = charger_panier()
+
+    del panier[sel[0]]
+
+    sauvegarder_panier(panier)
+
+    afficherPanier()
+
+
+def afficherPanier():
+
+    cart_list.delete(0, tk.END)
+
+    panier = charger_panier()
+
+    total = 0
+
+    for item in panier:
+
+        cart_list.insert(tk.END, item["name"])
+
+        try:
+            deals = jeu_actuel.recupererDeals(item["id"])
+            if deals:
+                total += deals[0]["price"]
+        except:
+            pass
+
+    total_label.configure(text=f"Total: {round(total,2)}$")
 
 # =========================
 # OUVRIR DEAL
@@ -174,124 +280,99 @@ def afficherFavoris():
 def ouvrirSite():
 
     sel = listbox.curselection()
-
     if not sel:
         return
 
     jeu = liste_jeux[sel[0]]
 
     url = f"https://www.cheapshark.com/redirect?dealID={jeu['cheapestDealID']}"
-
     webbrowser.open(url)
 
 
 # =========================
-# UI RECHERCHE
+# UI PRINCIPALE
 # =========================
 
-title = tk.Label(
-    tab_recherche,
-    text="🎮 CheapShark Comparator",
-    font=("Arial", 20, "bold"),
-    fg="white",
-    bg="#1E1E1E"
+frame = ctk.CTkFrame(app, corner_radius=20)
+frame.pack(padx=20, pady=20, fill="both", expand=True)
+
+
+title = ctk.CTkLabel(
+    frame,
+    text="🎮 CheapShark PRO Comparator",
+    font=("Arial", 24, "bold")
 )
 title.pack(pady=10)
 
 
-entry = tk.Entry(
-    tab_recherche,
-    width=40,
-    font=("Arial", 14),
-    bg="#2A2A2A",
-    fg="white",
-    insertbackground="white"
-)
-entry.pack(pady=10)
+# =========================
+# SEARCH BAR
+# =========================
+
+entry = ctk.CTkEntry(frame, placeholder_text="Search game...", width=300, corner_radius=15)
+entry.pack(pady=5)
+
+ctk.CTkButton(frame, text="Search", corner_radius=15, command=rechercher).pack(pady=5)
 
 
-tk.Button(
-    tab_recherche,
-    text="Rechercher",
-    command=rechercher
-).pack(pady=5)
-
+# =========================
+# LISTE JEUX
+# =========================
 
 listbox = tk.Listbox(
-    tab_recherche,
+    frame,
+    height=8,
     width=60,
-    height=10,
-    bg="#2A2A2A",
+    bg="#1f1f1f",
     fg="white",
-    selectbackground="#4C8BF5"
+    selectbackground="#3b82f6"
 )
 listbox.pack(pady=10)
 
-
-tk.Button(
-    tab_recherche,
-    text="Voir deals",
-    command=voirDeals
-).pack(pady=5)
-
-tk.Button(
-    tab_recherche,
-    text="Ajouter favoris",
-    command=ajouterFavori
-).pack(pady=5)
-
-tk.Button(
-    tab_recherche,
-    text="Ouvrir deal",
-    command=ouvrirSite
-).pack(pady=5)
+ctk.CTkButton(frame, text="Show Deals", corner_radius=15, command=voirDeals).pack(pady=5)
+ctk.CTkButton(frame, text="Open Deal", corner_radius=15, command=ouvrirSite).pack(pady=5)
+ctk.CTkButton(frame, text="Add Favorite", corner_radius=15, command=ajouterFavori).pack(pady=5)
 
 
-textbox = tk.Text(
-    tab_recherche,
-    width=80,
-    height=12,
-    bg="#2A2A2A",
-    fg="white"
-)
+# =========================
+# IMAGE + DEALS
+# =========================
+
+image_label = ctk.CTkLabel(frame, text="")
+image_label.pack(pady=10)
+
+textbox = ctk.CTkTextbox(frame, width=650, height=160, corner_radius=15)
 textbox.pack(pady=10)
 
 
 # =========================
-# FAVORIS TAB
+# FAVORIS SECTION AVANCEE
 # =========================
 
-tk.Label(
-    tab_favoris,
-    text="⭐ Mes Favoris",
-    font=("Arial", 20),
-    fg="white",
-    bg="#1E1E1E"
-).pack(pady=10)
+ctk.CTkLabel(frame, text="⭐ FAVORIS", font=("Arial", 18, "bold")).pack(pady=5)
 
+fav_search = ctk.CTkEntry(frame, placeholder_text="Search favorites...", width=300, corner_radius=15)
+fav_search.pack(pady=5)
 
-tk.Button(
-    tab_favoris,
-    text="Actualiser",
-    command=afficherFavoris
-).pack(pady=10)
+ctk.CTkButton(frame, text="Search Fav", command=rechercherFavoris, corner_radius=15).pack(pady=5)
 
-
-liste_fav = tk.Listbox(
-    tab_favoris,
+fav_list = tk.Listbox(
+    frame,
+    height=6,
     width=60,
-    height=20,
-    bg="#2A2A2A",
+    bg="#1f1f1f",
     fg="white"
 )
-liste_fav.pack(pady=10)
+fav_list.pack(pady=5)
 
+fav_list.bind("<Double-Button-1>", ouvrirFavori)
+
+ctk.CTkButton(frame, text="Delete Favorite", command=supprimerFavori, corner_radius=15).pack(pady=5)
+
+
+# =========================
+# INIT
+# =========================
 
 afficherFavoris()
-
-
-# =========================
-# RUN
-# =========================
-
-fenetre.mainloop()
+app.mainloop()
