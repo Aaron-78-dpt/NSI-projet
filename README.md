@@ -66,6 +66,7 @@ appliquer plusieurs notions vues en cours (algorithmique, POO, fichiers, etc.)
     projet/
     │── main.py
     │── api.py
+    │── interface.py
     │── favoris.json
     │── historique.txt
     │── requirements.txt
