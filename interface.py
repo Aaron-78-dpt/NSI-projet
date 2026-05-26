@@ -1,111 +1,48 @@
-import requests
 import tkinter as tk
 from tkinter import messagebox
+import json
+import webbrowser
+from PIL import Image, ImageTk
+from urllib.request import urlopen
+import io
 
+from api import Recherche
 
-class Recherche():
-
-    def __init__(self, gameName=""):
-
-        self.gameId = ""
-        self.name = ""
-        self.lowerPriceEver = 0
-        self.lowerPriceNow = 0
-        self.site = ""
-        self.gameName = gameName
-        self.storeID = ""
-        self.storeName = ""
-        self.storeStatus = 0
-
-    def __str__(self):
-
-        return (
-            f"Jeu : {self.name}\n"
-            f"Prix le plus bas EVER : {self.lowerPriceEver}$\n"
-            f"Prix actuel le plus bas : {self.lowerPriceNow}$\n"
-            f"Magasin : {self.storeName}\n"
-            f"Status : {self.storeStatus}"
-        )
-
-    def chercherJeux(self):
-
-        r = requests.get(
-            f'https://www.cheapshark.com/api/1.0/games?title={self.gameName}'
-        )
-
-        return r.json()
-
-    def choisirJeu(self, choix, data):
-
-        self.name = data[choix]["external"]
-        self.gameId = data[choix]["gameID"]
-
-    def moinChere(self):
-
-        r = requests.get(
-            f'https://www.cheapshark.com/api/1.0/games?ids={self.gameId}'
-        )
-
-        data = r.json()
-        data = data[self.gameId]
-
-        lowest_price = 999999
-
-        q = requests.get(
-            'https://www.cheapshark.com/api/1.0/stores'
-        )
-
-        stores = q.json()
-
-        for deal in data["deals"]:
-
-            store_id = deal["storeID"]
-
-            store = stores[int(store_id)]
-
-            if store["isActive"] == 1:
-
-                price = float(deal["price"])
-
-                if price < lowest_price:
-
-                    lowest_price = price
-
-                    self.lowerPriceNow = price
-                    self.storeID = store_id
-                    self.storeName = store["storeName"]
-                    self.storeStatus = "ON"
-
-        self.lowerPriceEver = float(
-            data["cheapestPriceEver"]["price"]
-        )
-
-
-# =========================
-# INTERFACE GRAPHIQUE
-# =========================
 
 fenetre = tk.Tk()
+
 fenetre.title("Comparateur CheapShark")
-fenetre.geometry("1440x1080")
-fenetre.config(bg="#1e1e1e")
+fenetre.geometry("900x600")
 
-jeu_actuel = None
+
 liste_jeux = []
+jeu_actuel = None
+image_label = None
+photo = None
 
 
-# ===== Recherche =====
+# =========================
+# RECHERCHE
+# =========================
 
 def rechercher():
 
-    global jeu_actuel
     global liste_jeux
+    global jeu_actuel
 
     nom = entry.get()
 
     if nom == "":
-        messagebox.showerror("Erreur", "Entre un nom de jeu")
         return
+
+    # historique
+    with open(
+        "historique.txt",
+        "a",
+        encoding="utf-8"
+    ) as f:
+
+        f.write(nom + "\n")
 
     jeu_actuel = Recherche(nom)
 
@@ -115,44 +52,157 @@ def rechercher():
 
     for jeu in liste_jeux[:20]:
 
-        listbox.insert(tk.END, jeu["external"])
+        listbox.insert(
+            tk.END,
+            jeu["external"]
+        )
 
 
-# ===== Sélection =====
+# =========================
+# AFFICHER DEALS
+# =========================
 
-def selectionner():
-
-    global jeu_actuel
-    global liste_jeux
+def voirDeals():
 
     selection = listbox.curselection()
 
     if not selection:
-        messagebox.showerror("Erreur", "Choisis un jeu")
         return
 
     index = selection[0]
 
-    jeu_actuel.choisirJeu(index, liste_jeux)
+    jeu = liste_jeux[index]
 
-    jeu_actuel.moinChere()
+    afficherImage(
+        jeu["thumb"]
+    )
 
-    resultat.config(
-        text=str(jeu_actuel)
+    gameID = jeu["gameID"]
+
+    deals = jeu_actuel.recupererDeals(gameID)
+
+    textbox.delete("1.0", tk.END)
+
+    for deal in deals:
+
+        texte = (
+            f"{deal['store']} | "
+            f"{deal['price']}$ | "
+            f"-{deal['savings']}%\n"
+        )
+
+        textbox.insert(
+            tk.END,
+            texte
+        )
+
+# =========================
+# AFFICHER IMAGE
+# =========================
+
+def afficherImage(url):
+
+    global photo
+    global image_label
+
+    image_bytes = urlopen(url).read()
+
+    data_stream = io.BytesIO(image_bytes)
+
+    pil_image = Image.open(data_stream)
+
+    pil_image = pil_image.resize((200, 250))
+
+    photo = ImageTk.PhotoImage(pil_image)
+
+    image_label.config(image=photo)
+
+
+# =========================
+# FAVORIS
+# =========================
+
+def ajouterFavori():
+
+    selection = listbox.curselection()
+
+    if not selection:
+        return
+
+    index = selection[0]
+
+    jeu = liste_jeux[index]
+
+    favoris = []
+
+    try:
+
+        with open(
+            "favoris.json",
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            favoris = json.load(f)
+
+    except:
+        pass
+
+    favoris.append(jeu["external"])
+
+    with open(
+        "favoris.json",
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            favoris,
+            f,
+            indent=4
+        )
+
+    messagebox.showinfo(
+        "Favoris",
+        "Jeu ajouté aux favoris"
     )
 
 
-# ===== Widgets =====
+# =========================
+# OUVRIR DEAL
+# =========================
+
+def ouvrirSite():
+
+    selection = listbox.curselection()
+
+    if not selection:
+        return
+
+    index = selection[0]
+
+    jeu = liste_jeux[index]
+
+    url = (
+        "https://www.cheapshark.com/"
+        f"redirect?dealID={jeu['cheapestDealID']}"
+    )
+
+    webbrowser.open(url)
+
+
+# =========================
+# INTERFACE
+# =========================
 
 titre = tk.Label(
     fenetre,
-    text="Comparateur de Prix Jeux Vidéo",
-    font=("Arial", 20),
-    bg="#1e1e1e",
-    fg="white"
+    text="Comparateur CheapShark",
+    font=("Arial", 22)
 )
 
 titre.pack(pady=20)
+
 
 entry = tk.Entry(
     fenetre,
@@ -162,46 +212,62 @@ entry = tk.Entry(
 
 entry.pack(pady=10)
 
-boutonRecherche = tk.Button(
+
+btnRecherche = tk.Button(
     fenetre,
     text="Rechercher",
-    command=rechercher,
-    bg="#2F0953",
-    fg="white",
-    font=("Arial", 12)
+    command=rechercher
 )
 
-boutonRecherche.pack(pady=10)
+btnRecherche.pack(pady=10)
+
 
 listbox = tk.Listbox(
     fenetre,
     width=50,
-    height=10,
-    font=("Arial", 12)
+    height=10
 )
 
 listbox.pack(pady=10)
 
-boutonChoix = tk.Button(
+
+btnDeals = tk.Button(
     fenetre,
-    text="Voir le meilleur prix",
-    command=selectionner,
-    bg="#2F0953",
-    fg="white",
-    font=("Arial", 12)
+    text="Voir tous les deals",
+    command=voirDeals
 )
 
-boutonChoix.pack(pady=10)
+btnDeals.pack(pady=5)
 
-resultat = tk.Label(
+
+btnFavoris = tk.Button(
     fenetre,
-    text="",
-    font=("Arial", 12),
-    bg="#1e1e1e",
-    fg="white",
-    justify="left"
+    text="Ajouter aux favoris",
+    command=ajouterFavori
 )
 
-resultat.pack(pady=20)
+btnFavoris.pack(pady=5)
+
+
+btnSite = tk.Button(
+    fenetre,
+    text="Ouvrir le deal",
+    command=ouvrirSite
+)
+
+btnSite.pack(pady=5)
+
+
+textbox = tk.Text(
+    fenetre,
+    width=70,
+    height=15
+)
+
+textbox.pack(pady=20)
+
+image_label = tk.Label(fenetre)
+
+image_label.pack(pady=10)
 
 fenetre.mainloop()
