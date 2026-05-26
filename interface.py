@@ -87,7 +87,7 @@ class Recherche():
 
 fenetre = tk.Tk()
 fenetre.title("Comparateur CheapShark")
-fenetre.geometry("700x500")
+fenetre.geometry("1440x1080")
 fenetre.config(bg="#1e1e1e")
 
 jeu_actuel = None
@@ -166,7 +166,7 @@ boutonRecherche = tk.Button(
     fenetre,
     text="Rechercher",
     command=rechercher,
-    bg="#4CAF50",
+    bg="#2F0953",
     fg="white",
     font=("Arial", 12)
 )
@@ -186,7 +186,7 @@ boutonChoix = tk.Button(
     fenetre,
     text="Voir le meilleur prix",
     command=selectionner,
-    bg="#2196F3",
+    bg="#2F0953",
     fg="white",
     font=("Arial", 12)
 )
