@@ -26,7 +26,7 @@ appliquer plusieurs notions vues en cours (algorithmique, POO, fichiers, etc.)
     
     Python 3
     [requests] (si API utilisée)
-    [tkinter / Flask / autre interface]
+    [tkinter / customtkinter]
     [JSON]
 
 📊 Fonctionnalités techniques intégrées
@@ -44,7 +44,7 @@ appliquer plusieurs notions vues en cours (algorithmique, POO, fichiers, etc.)
     
     ✔ Traitement de données
     
-    ✔ Algorithme(s) spécifique(s) : [recherche / tri /]
+    ✔ Algorithme(s) spécifique(s) : [recherche / tri ]
     
     ✔  utilisation d’une API 
     
@@ -100,7 +100,7 @@ appliquer plusieurs notions vues en cours (algorithmique, POO, fichiers, etc.)
 
     Une des principales difficultés rencontrées a été :
     
-    Correltion entre le code api et l'interface graphique
+    Correlation entre le code api et l'interface graphique
     gestion des erreur 
     expliquation nouveaux module
     
