@@ -1,3 +1,4 @@
+Il faut installer les modules suivants dans le terminal :
 requests
 pillow
 customtkinter
