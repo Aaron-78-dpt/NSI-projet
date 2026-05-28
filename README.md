@@ -25,7 +25,7 @@ appliquer plusieurs notions vues en cours (algorithmique, POO, fichiers, etc.)
     Ce projet utilise les technologies suivantes :
     
     Python 3
-    [requests] (si API utilisée)
+    [requests] 
     [tkinter / customtkinter]
     [JSON]
 
